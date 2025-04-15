@@ -151,6 +151,35 @@ resource "helm_release" "karpenter" {
   ]
 }
 
+resource "kubernetes_manifest" "karpenter_ec2_node_class" {
+  manifest = {
+    apiVersion = "karpenter.k8s.aws/v1"
+    kind       = "EC2NodeClass"
+    metadata = {
+      name = "default"
+    }
+    spec = {
+      amiFamily = "Bottlerocket"
+      subnetSelectorTerms = [{
+        tags = {
+          "karpenter.sh/discovery" = local.name
+        }
+      }]
+      securityGroupSelectorTerms = [{
+        tags = {
+          "karpenter.sh/discovery" = local.name
+        }
+      }]
+      instanceProfile = module.karpenter.instance_profile_name
+      tags = {
+        Name = local.name
+      }
+    }
+  }
+
+  depends_on = [helm_release.karpenter]
+}
+
 
 
 ################################################################################
@@ -178,6 +207,7 @@ module "vpc" {
 
   private_subnet_tags = {
     "kubernetes.io/role/internal-elb" = 1
+    # Tags subnets for Karpenter auto-discovery
     "karpenter.sh/discovery" = local.name
   }
 
